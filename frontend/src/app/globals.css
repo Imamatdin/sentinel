@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+
+@layer base {
+  body {
+    @apply bg-sentinel-950 text-sentinel-100 font-sans antialiased;
+  }
+
+  /* Scrollbar styling - monochrome */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-sentinel-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-sentinel-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-sentinel-500;
+  }
+
+  /* Selection - monochrome */
+  ::selection {
+    @apply bg-sentinel-300 text-sentinel-900;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-sentinel-900 border border-sentinel-800 rounded-lg;
+  }
+
+  .panel-header {
+    @apply px-4 py-3 border-b border-sentinel-800 font-medium text-sm uppercase tracking-wider text-sentinel-400;
+  }
+
+  .panel-body {
+    @apply p-4;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-mono rounded border;
+  }
+
+  .badge-red {
+    @apply border-sentinel-600 text-sentinel-300 bg-sentinel-800;
+  }
+
+  .badge-blue {
+    @apply border-sentinel-500 text-sentinel-200 bg-sentinel-800/50;
+  }
+
+  .badge-system {
+    @apply border-sentinel-700 text-sentinel-500 bg-sentinel-900;
+  }
+}
+
+/* Event timeline auto-scroll */
+.timeline-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Monospace code blocks */
+.code-block {
+  @apply font-mono text-xs leading-relaxed bg-sentinel-950 border border-sentinel-800 rounded p-3 overflow-x-auto;
+}

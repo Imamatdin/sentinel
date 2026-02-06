@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SENTINEL Pentest Report</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @bottom-center {
+                content: "SENTINEL - Page " counter(page) " of " counter(pages);
+                font-size: 8pt;
+                color: #737373;
+            }
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            color: #1a1a1a;
+            font-size: 10.5pt;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .report-header {
+            background: #0a0a0a;
+            color: #fafafa;
+            padding: 30px;
+            margin: -2cm -2cm 2em -2cm;
+            padding: 2cm 2cm 30px 2cm;
+        }
+        .report-header h1 {
+            font-size: 28pt;
+            margin: 0 0 5px 0;
+            letter-spacing: 2px;
+        }
+        .report-header .subtitle {
+            color: #a3a3a3;
+            font-size: 11pt;
+        }
+        .report-header .meta {
+            margin-top: 15px;
+            font-size: 9pt;
+            color: #d4d4d4;
+        }
+        .report-header .meta span {
+            margin-right: 20px;
+        }
+
+        /* Section headers */
+        h2 {
+            font-size: 16pt;
+            border-bottom: 2px solid #0a0a0a;
+            padding-bottom: 5px;
+            margin-top: 2em;
+            page-break-after: avoid;
+        }
+        h3 {
+            font-size: 13pt;
+            margin-top: 1.5em;
+            page-break-after: avoid;
+        }
+
+        /* Stats grid */
+        .stats-grid {
+            display: flex;
+            gap: 15px;
+            margin: 1em 0;
+        }
+        .stat-box {
+            flex: 1;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-box .value {
+            font-size: 22pt;
+            font-weight: 700;
+            display: block;
+        }
+        .stat-box .label {
+            font-size: 8pt;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #525252;
+        }
+
+        /* Severity badges */
+        .severity {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 9pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .severity-critical { background: #dc2626; color: white; }
+        .severity-high { background: #f97316; color: white; }
+        .severity-medium { background: #eab308; color: #1a1a1a; }
+        .severity-low { background: #3b82f6; color: white; }
+        .severity-info { background: #a3a3a3; color: white; }
+
+        /* Finding cards */
+        .finding {
+            page-break-inside: avoid;
+            margin-bottom: 1.5em;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        .finding-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .finding-title {
+            font-weight: 600;
+            font-size: 11pt;
+        }
+
+        /* Evidence blocks */
+        .evidence {
+            background: #f4f4f5;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 8.5pt;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            margin: 8px 0;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            font-size: 9.5pt;
+        }
+        th, td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e5e5;
+            text-align: left;
+        }
+        th {
+            background: #171717;
+            color: white;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        tr:nth-child(even) {
+            background: #fafafa;
+        }
+
+        /* Reports section */
+        .report-content {
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8.5pt;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            page-break-inside: auto;
+        }
+
+        /* Genome table */
+        .genome-table td {
+            font-size: 8.5pt;
+        }
+        .genome-table .mono {
+            font-family: monospace;
+            font-size: 8pt;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="report-header">
+        <h1>SENTINEL</h1>
+        <div class="subtitle">Autonomous AI Penetration Test Report</div>
+        <div class="meta">
+            <span>Target: {{ target_url }}</span>
+            <span>Generated: {{ generated_at }}</span>
+            <span>Duration: {{ "%.1f"|format(duration) }}s</span>
+        </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <h2>Executive Summary</h2>
+    <p>
+        SENTINEL performed an autonomous penetration test against
+        <strong>{{ target_url }}</strong> using AI-powered red and blue team agents.
+        The engagement lasted {{ "%.1f"|format(duration) }} seconds and generated
+        {{ event_count }} events. {{ finding_count }} potential vulnerabilities were identified.
+    </p>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <span class="value">{{ finding_count }}</span>
+            <span class="label">Findings</span>
+        </div>
+        <div class="stat-box">
+            <span class="value">{{ "%.0f"|format(avg_tokens_per_second) }}</span>
+            <span class="label">Tokens/sec</span>
+        </div>
+        <div class="stat-box">
+            <span class="value">{{ total_tool_calls }}</span>
+            <span class="label">Tool Calls</span>
+        </div>
+        <div class="stat-box">
+            <span class="value">{{ "%.1f"|format(duration) }}s</span>
+            <span class="label">Duration</span>
+        </div>
+    </div>
+
+    <!-- Agent Performance -->
+    <h2>Agent Performance</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Agent</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Tool Calls</th>
+                <th>Tokens</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for name, agent in agents.items() %}
+            <tr>
+                <td><strong>{{ name }}</strong></td>
+                <td>{{ "OK" if agent.success else "FAILED" }}</td>
+                <td>{{ "%.1f"|format(agent.duration) }}s</td>
+                <td>{{ agent.tool_calls }}</td>
+                <td>{{ agent.output_tokens }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Findings -->
+    {% if findings %}
+    <h2>Vulnerability Findings</h2>
+    {% for finding in findings %}
+    <div class="finding">
+        <div class="finding-header">
+            <span class="finding-title">
+                {{ finding.get("title", finding.get("type", finding.get("vuln_type", "Finding"))) }}
+            </span>
+            <span class="severity severity-{{ finding.get('severity', 'info')|lower }}">
+                {{ finding.get("severity", "info")|upper }}
+            </span>
+        </div>
+
+        {% if finding.get("description") %}
+        <p>{{ finding.description }}</p>
+        {% endif %}
+
+        {% if finding.get("endpoint") or finding.get("url") %}
+        <p><strong>Endpoint:</strong> <code>{{ finding.get("endpoint", finding.get("url", "")) }}</code></p>
+        {% endif %}
+
+        {% if finding.get("evidence") %}
+        <div class="evidence">{{ finding.evidence if finding.evidence is string else finding.evidence|tojson(indent=2) }}</div>
+        {% endif %}
+
+        {% if finding.get("payload") %}
+        <div class="evidence">Payload: {{ finding.payload }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Red Team Report -->
+    {% if red_report %}
+    <h2>Red Team Report</h2>
+    <div class="report-content">{{ red_report }}</div>
+    {% endif %}
+
+    <!-- Blue Team Report -->
+    {% if blue_report %}
+    <h2>Blue Team Defense Report</h2>
+    <div class="report-content">{{ blue_report }}</div>
+    {% endif %}
+
+    <!-- Genome Patterns -->
+    {% if genome_patterns %}
+    <h2>Security Genome Patterns</h2>
+    <p>
+        The following vulnerability patterns were extracted from this engagement
+        and stored in the Security Genome database for cross-session learning.
+    </p>
+    <table class="genome-table">
+        <thead>
+            <tr>
+                <th>Attack Vector</th>
+                <th>CWE</th>
+                <th>CAPEC</th>
+                <th>Severity</th>
+                <th>Root Cause</th>
+                <th>Remediation</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in genome_patterns %}
+            <tr>
+                <td class="mono">{{ p.attack_vector }}</td>
+                <td class="mono">{{ p.cwe_id or "-" }}</td>
+                <td class="mono">{{ p.capec_id or "-" }}</td>
+                <td>
+                    <span class="severity severity-{{ p.severity|lower }}">
+                        {{ p.severity|upper }}
+                    </span>
+                </td>
+                <td>{{ p.root_cause }}</td>
+                <td>{{ p.remediation_pattern }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Footer -->
+    <div style="margin-top: 3em; padding-top: 1em; border-top: 1px solid #d4d4d4; font-size: 8pt; color: #737373;">
+        Generated by SENTINEL v0.1.0 | Powered by Cerebras Inference
+    </div>
+
+</body>
+</html>

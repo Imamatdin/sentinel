@@ -8,6 +8,7 @@ This is a singleton within the FastAPI application.
 """
 
 import asyncio
+import os
 import time
 from typing import Any, Optional
 from enum import Enum
@@ -175,6 +176,32 @@ class EngagementManager:
                 success=result.success,
                 duration=f"{result.duration:.1f}s",
             )
+
+            # ── Run Security Genome Pipeline ──
+            if result.agent_results:
+                try:
+                    from sentinel.genome.pipeline import GenomePipeline
+
+                    pipeline = GenomePipeline(
+                        client=self._orchestrator._create_client(),
+                        enable_nvd=bool(os.environ.get("NVD_API_KEY")),
+                    )
+                    genome_stats = await pipeline.run(
+                        agent_results=result.agent_results,
+                        session_id=result.target_url,
+                    )
+
+                    # Emit genome event
+                    from sentinel.events.bus import Event
+                    await self.event_bus.publish(Event(
+                        type="genome.pipeline_complete",
+                        data=genome_stats,
+                        source="genome",
+                    ))
+                    logger.info("genome_pipeline_complete", **genome_stats)
+                except Exception as e:
+                    logger.error("genome_pipeline_failed", error=str(e))
+
         except asyncio.CancelledError:
             logger.info("engagement_cancelled")
             self._state = EngagementState.FAILED

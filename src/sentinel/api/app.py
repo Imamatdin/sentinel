@@ -8,6 +8,7 @@ Creates the FastAPI app with:
 - EngagementManager dependency injection
 """
 
+import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -16,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sentinel.config import Settings, get_settings
 from sentinel.api.routes import router, get_manager
+from sentinel.api.genome_routes import router as genome_router
+from sentinel.api.export_routes import router as export_router
 from sentinel.api.websocket import websocket_handler
 from sentinel.api.manager import EngagementManager
 from sentinel.logging_config import setup_logging, get_logger
@@ -95,6 +98,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     # Mount REST routes
     app.include_router(router, prefix="/api")
+    app.include_router(genome_router, prefix="/api/genome", tags=["genome"])
+    app.include_router(export_router, prefix="/api/export", tags=["export"])
 
     # WebSocket endpoint (not under /api prefix for cleaner URL)
     @app.websocket("/ws")
