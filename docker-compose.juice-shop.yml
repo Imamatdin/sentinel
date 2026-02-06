@@ -1,0 +1,20 @@
+# OWASP Juice Shop - Target application for SENTINEL pentesting
+# Start with: docker compose -f docker-compose.juice-shop.yml up -d
+# Access at: http://localhost:3000
+# REST API docs: http://localhost:3000/api-docs
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: sentinel-juice-shop
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=unsafe
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
