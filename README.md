@@ -136,7 +136,7 @@ GET /api/genome/patterns?cwe_id=CWE-89&severity=critical
 
 | Component | Technology |
 |-----------|------------|
-| LLM | Cerebras Cloud (llama-3.3-70b) |
+| LLM | Cerebras Cloud (zai-glm-4.7) |
 | Backend | FastAPI + WebSocket + asyncio |
 | Frontend | Next.js 14 + TypeScript + Tailwind |
 | Target | OWASP Juice Shop |
