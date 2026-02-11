@@ -74,7 +74,7 @@ class Tool:
                     "properties": properties,
                     "required": required,
                 },
-                "strict": True,
+                
             },
         }
 

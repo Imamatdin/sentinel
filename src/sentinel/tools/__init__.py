@@ -23,6 +23,12 @@ from sentinel.tools.blue.waf import WAFEngine
 from sentinel.tools.blue.responder import Responder
 from sentinel.logging_config import get_logger
 
+# Phase 4: Reconnaissance tools
+from sentinel.tools.nmap_tool import NmapTool, NmapResult, HostResult, PortResult
+from sentinel.tools.dns_tool import DNSTool, DNSResult, DNSRecord
+from sentinel.tools.http_recon import HTTPReconTool, HTTPRequest, HTTPResponse
+from sentinel.tools.crawler import WebCrawler, CrawlResult
+
 logger = get_logger(__name__)
 
 

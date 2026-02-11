@@ -1,0 +1,113 @@
+services:
+  # === Knowledge Graph ===
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: sentinel-neo4j
+    ports:
+      - "7474:7474"  # Browser
+      - "7687:7687"  # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/sentinel_password
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === Workflow Orchestration ===
+  temporal:
+    image: temporalio/auto-setup:1.25
+    container_name: sentinel-temporal
+    ports:
+      - "7233:7233"  # gRPC
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal_password
+      - POSTGRES_SEEDS=temporal-db
+      - DYNAMIC_CONFIG_FILE_PATH=/etc/temporal/dynamicconfig.yaml
+    volumes:
+      - ./temporal/dynamicconfig.yaml:/etc/temporal/dynamicconfig.yaml
+    depends_on:
+      temporal-db:
+        condition: service_healthy
+
+  temporal-db:
+    image: postgres:16-alpine
+    container_name: sentinel-temporal-db
+    environment:
+      - POSTGRES_USER=temporal
+      - POSTGRES_PASSWORD=temporal_password
+    volumes:
+      - temporal_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    container_name: sentinel-temporal-ui
+    ports:
+      - "8233:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+
+  # === Vector Store for Genome ===
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sentinel-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=sentinel
+      - POSTGRES_PASSWORD=sentinel_password
+      - POSTGRES_DB=sentinel
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # === OWASP ZAP (Proxy) ===
+  zap:
+    image: zaproxy/zap-stable:2.15.0
+    container_name: sentinel-zap
+    ports:
+      - "8080:8080"  # Proxy
+      - "8090:8090"  # API
+    command: zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true -config api.disablekey=true
+    volumes:
+      - zap_data:/zap/wrk
+
+  # === Test Target ===
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: sentinel-juice-shop
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  temporal_db_data:
+  postgres_data:
+  zap_data:
+
+networks:
+  default:
+    name: sentinel-network

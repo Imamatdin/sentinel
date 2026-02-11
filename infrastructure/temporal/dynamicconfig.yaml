@@ -1,0 +1,10 @@
+# Temporal dynamic configuration
+frontend.enableClientVersionCheck:
+  - value: true
+    constraints: {}
+limit.maxIDLength:
+  - value: 1000
+    constraints: {}
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}

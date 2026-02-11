@@ -1,0 +1,51 @@
+"""Knowledge Graph module for Sentinel."""
+
+from sentinel.graph.models import (
+    NodeType,
+    EdgeType,
+    Severity,
+    SessionType,
+    CredentialType,
+    BaseNode,
+    BaseEdge,
+    Host,
+    Port,
+    Service,
+    Vulnerability,
+    Credential,
+    Session,
+    Endpoint,
+    CriticalAsset,
+    AttackPath,
+    AttackPathStep,
+    GraphSnapshot,
+)
+from sentinel.graph.neo4j_client import (
+    Neo4jClient,
+    get_graph_client,
+    close_graph_client,
+)
+
+__all__ = [
+    "NodeType",
+    "EdgeType",
+    "Severity",
+    "SessionType",
+    "CredentialType",
+    "BaseNode",
+    "BaseEdge",
+    "Host",
+    "Port",
+    "Service",
+    "Vulnerability",
+    "Credential",
+    "Session",
+    "Endpoint",
+    "CriticalAsset",
+    "AttackPath",
+    "AttackPathStep",
+    "GraphSnapshot",
+    "Neo4jClient",
+    "get_graph_client",
+    "close_graph_client",
+]
