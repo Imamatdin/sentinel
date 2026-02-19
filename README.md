@@ -202,4 +202,13 @@ The base platform is **complete**. These 31 research-driven levels add enterpris
 
 ## License
 
-MIT
+This project is licensed under the **Business Source License 1.1 (BSL 1.1)**.
+
+- **Non-production use**: Free (development, testing, research)
+- **Production use**: Requires commercial license or compliance with Additional Use Grant
+- **Change Date**: 2030-02-19 (becomes GPL v2.0+ on this date)
+- **Competing use**: Prohibited without explicit permission
+
+For commercial licensing inquiries, please open an issue or contact the author.
+
+See [LICENSE](./LICENSE) for full terms.
