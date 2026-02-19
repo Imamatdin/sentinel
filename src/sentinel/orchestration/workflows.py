@@ -2,6 +2,9 @@
 
 Workflows define the control flow - they don't do I/O directly,
 but orchestrate activities and handle signals/queries.
+
+Phase 7: Wired to real tool activities with heartbeats, timeouts, and
+human-in-the-loop approval for CRITICAL exploits.
 """
 
 import asyncio
@@ -20,11 +23,16 @@ with workflow.unsafe.imports_passed_through():
         scan_ports,
         identify_services,
         crawl_endpoints,
+        http_recon,
+        generate_hypotheses,
         analyze_service_vulns,
         analyze_endpoint_vulns,
+        run_nuclei_scan,
+        run_zap_scan,
         attempt_exploit,
         verify_exploit,
         generate_replay_script,
+        generate_poc_artifacts,
         create_snapshot,
         generate_report,
     )
@@ -49,6 +57,7 @@ EXPLOIT_RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=10),
     maximum_interval=timedelta(minutes=5),
     maximum_attempts=3,
+    non_retryable_error_types=["PolicyDeniedError", "AuthorizationError"],
 )
 
 
@@ -61,6 +70,7 @@ class PentestState:
     services_discovered: int = 0
     endpoints_discovered: int = 0
     vulnerabilities_found: int = 0
+    hypotheses_generated: int = 0
     exploits_attempted: int = 0
     exploits_successful: int = 0
     sessions_obtained: int = 0
@@ -74,11 +84,11 @@ class PentestWorkflow:
     """Main pentest orchestration workflow.
 
     Phases:
-    1. Reconnaissance - discover hosts, ports, services, endpoints
-    2. Vulnerability Analysis - identify vulnerabilities
-    3. Exploitation - attempt exploits (with optional approval gate)
-    4. Verification - verify exploits are reproducible
-    5. Reporting - generate final report
+    1. Reconnaissance - discover hosts, ports, services, endpoints (real tools)
+    2. Vulnerability Analysis - hypotheses + GuardedVulnAgent + Nuclei/ZAP
+    3. Exploitation - GuardedExploitAgent (with approval gate for CRITICAL)
+    4. Verification - FindingVerifier replay
+    5. Reporting - PoC artifacts + report generation
     """
 
     def __init__(self):
@@ -99,6 +109,13 @@ class PentestWorkflow:
         """Signal to approve exploitation phase."""
         workflow.logger.info("Exploitation approved")
         self.state.approval_granted = True
+        self.state.awaiting_approval = False
+
+    @workflow.signal
+    async def approve_critical_exploit(self, approved: bool) -> None:
+        """Human-in-the-loop: approve or deny CRITICAL exploit execution."""
+        workflow.logger.info(f"Critical exploit approval: {approved}")
+        self.state.approval_granted = approved
         self.state.awaiting_approval = False
 
     @workflow.signal
@@ -130,6 +147,7 @@ class PentestWorkflow:
             "services_discovered": self.state.services_discovered,
             "endpoints_discovered": self.state.endpoints_discovered,
             "vulnerabilities_found": self.state.vulnerabilities_found,
+            "hypotheses_generated": self.state.hypotheses_generated,
             "exploits_attempted": self.state.exploits_attempted,
             "exploits_successful": self.state.exploits_successful,
             "sessions_obtained": self.state.sessions_obtained,
@@ -194,25 +212,27 @@ class PentestWorkflow:
             raise
 
     async def _phase_recon(self) -> None:
-        """Execute reconnaissance phase."""
+        """Execute reconnaissance phase with real tools."""
         self.state.phase = "reconnaissance"
         workflow.logger.info("Phase 1: Reconnaissance")
 
-        # Discover hosts
+        # Discover hosts (NmapTool + DNSTool)
         self.host_ids = await workflow.execute_activity(
             discover_hosts,
             self.config,
             start_to_close_timeout=timedelta(minutes=10),
+            heartbeat_timeout=timedelta(minutes=2),
             retry_policy=STANDARD_RETRY,
         )
         self.state.hosts_discovered = len(self.host_ids)
 
-        # Scan ports in parallel for all hosts
+        # Scan ports in parallel for all hosts (NmapTool)
         port_results = await asyncio.gather(*[
             workflow.execute_activity(
                 scan_ports,
                 args=[host_id, self.config.engagement_id],
                 start_to_close_timeout=timedelta(minutes=5),
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=STANDARD_RETRY,
             )
             for host_id in self.host_ids
@@ -221,7 +241,7 @@ class PentestWorkflow:
             self.port_ids.extend(result)
         self.state.ports_discovered = len(self.port_ids)
 
-        # Identify services in parallel
+        # Identify services in parallel (HTTPReconTool fingerprinting)
         service_results = await asyncio.gather(*[
             workflow.execute_activity(
                 identify_services,
@@ -234,12 +254,13 @@ class PentestWorkflow:
         self.service_ids = [s for s in service_results if s is not None]
         self.state.services_discovered = len(self.service_ids)
 
-        # Crawl endpoints for web services
+        # Crawl endpoints for web services (WebCrawler)
         endpoint_results = await asyncio.gather(*[
             workflow.execute_activity(
                 crawl_endpoints,
                 args=[service_id, self.config.engagement_id, self.config.target_url],
-                start_to_close_timeout=timedelta(minutes=10),
+                start_to_close_timeout=timedelta(minutes=15),
+                heartbeat_timeout=timedelta(minutes=3),
                 retry_policy=STANDARD_RETRY,
             )
             for service_id in self.service_ids
@@ -247,6 +268,14 @@ class PentestWorkflow:
         for result in endpoint_results:
             self.endpoint_ids.extend(result)
         self.state.endpoints_discovered = len(self.endpoint_ids)
+
+        # HTTP recon on target (headers, tech stack)
+        await workflow.execute_activity(
+            http_recon,
+            args=[self.config.target_url, self.config.engagement_id],
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=FAST_RETRY,
+        )
 
         workflow.logger.info(
             f"Recon complete: {self.state.hosts_discovered} hosts, "
@@ -256,16 +285,26 @@ class PentestWorkflow:
         )
 
     async def _phase_vuln_analysis(self) -> None:
-        """Execute vulnerability analysis phase."""
+        """Execute vulnerability analysis phase with real tools."""
         self.state.phase = "vulnerability_analysis"
         workflow.logger.info("Phase 2: Vulnerability Analysis")
 
-        # Analyze services in parallel
+        # Generate hypotheses from recon data (HypothesisEngine)
+        hypotheses = await workflow.execute_activity(
+            generate_hypotheses,
+            self.config.engagement_id,
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=FAST_RETRY,
+        )
+        self.state.hypotheses_generated = len(hypotheses)
+
+        # Analyze services in parallel (GuardedVulnAgent)
         service_vuln_results = await asyncio.gather(*[
             workflow.execute_activity(
                 analyze_service_vulns,
                 args=[service_id, self.config.engagement_id],
-                start_to_close_timeout=timedelta(minutes=5),
+                start_to_close_timeout=timedelta(minutes=30),
+                heartbeat_timeout=timedelta(minutes=5),
                 retry_policy=STANDARD_RETRY,
             )
             for service_id in self.service_ids
@@ -273,12 +312,13 @@ class PentestWorkflow:
         for result in service_vuln_results:
             self.vuln_ids.extend(result)
 
-        # Analyze endpoints in parallel
+        # Analyze endpoints in parallel (ZAP + HTTP header checks)
         endpoint_vuln_results = await asyncio.gather(*[
             workflow.execute_activity(
                 analyze_endpoint_vulns,
                 args=[endpoint_id, self.config.engagement_id],
-                start_to_close_timeout=timedelta(minutes=5),
+                start_to_close_timeout=timedelta(minutes=10),
+                heartbeat_timeout=timedelta(minutes=3),
                 retry_policy=STANDARD_RETRY,
             )
             for endpoint_id in self.endpoint_ids
@@ -305,7 +345,7 @@ class PentestWorkflow:
             workflow.logger.warning("Approval timeout")
 
     async def _phase_exploitation(self) -> None:
-        """Execute exploitation phase."""
+        """Execute exploitation phase with real GuardedExploitAgent."""
         self.state.phase = "exploitation"
         workflow.logger.info("Phase 3: Exploitation")
 
@@ -314,6 +354,7 @@ class PentestWorkflow:
                 attempt_exploit,
                 args=[vuln_id, self.config.engagement_id, False],
                 start_to_close_timeout=timedelta(minutes=10),
+                heartbeat_timeout=timedelta(minutes=3),
                 retry_policy=EXPLOIT_RETRY,
             )
             self.exploit_results.append(result)
@@ -329,7 +370,7 @@ class PentestWorkflow:
         )
 
     async def _phase_verification(self) -> None:
-        """Execute verification phase."""
+        """Execute verification phase with FindingVerifier."""
         self.state.phase = "verification"
         workflow.logger.info("Phase 4: Verification")
 
@@ -341,6 +382,7 @@ class PentestWorkflow:
                     verify_exploit,
                     args=[exploit.vulnerability_id, exploit.session_id, self.config.engagement_id],
                     start_to_close_timeout=timedelta(minutes=5),
+                    heartbeat_timeout=timedelta(minutes=2),
                     retry_policy=FAST_RETRY,
                 )
 
@@ -354,9 +396,26 @@ class PentestWorkflow:
         workflow.logger.info("Verification complete")
 
     async def _phase_reporting(self) -> dict[str, Any]:
-        """Execute reporting phase."""
+        """Execute reporting phase with PoC artifacts and report generation."""
         self.state.phase = "reporting"
         workflow.logger.info("Phase 5: Reporting")
+
+        # Generate PoC artifacts for all exploited findings
+        exploited_findings = [
+            {
+                "category": e.technique,
+                "evidence": str(e.evidence or ""),
+                "http_traces": [{"method": "GET", "url": "", "headers": {}, "body": ""}],
+            }
+            for e in self.exploit_results if e.success
+        ]
+        if exploited_findings:
+            await workflow.execute_activity(
+                generate_poc_artifacts,
+                args=[self.config.engagement_id, exploited_findings],
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=FAST_RETRY,
+            )
 
         snapshot = await workflow.execute_activity(
             create_snapshot,
@@ -396,6 +455,7 @@ class ReconOnlyWorkflow:
             discover_hosts,
             config,
             start_to_close_timeout=timedelta(minutes=10),
+            heartbeat_timeout=timedelta(minutes=2),
             retry_policy=STANDARD_RETRY,
         )
 
@@ -405,6 +465,7 @@ class ReconOnlyWorkflow:
                 scan_ports,
                 args=[host_id, config.engagement_id],
                 start_to_close_timeout=timedelta(minutes=5),
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=STANDARD_RETRY,
             )
             all_ports.extend(ports)

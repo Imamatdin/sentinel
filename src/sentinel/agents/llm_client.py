@@ -310,6 +310,36 @@ class CerebrasClient(BaseLLMClient):
         raise NotImplementedError("Cerebras tool use not yet implemented")
 
 
+class OpenAIEmbeddingClient:
+    """OpenAI embedding client for vector generation."""
+
+    def __init__(self, model: str = "text-embedding-3-small"):
+        settings = get_settings()
+        import openai
+        api_key = settings.openai_api_key
+        if api_key is None:
+            raise LLMError("OpenAI API key not configured (required for embeddings)")
+        self.client = openai.AsyncOpenAI(api_key=api_key.get_secret_value())
+        self.model = model
+        self.dimension = 1536
+
+    async def embed(self, text: str) -> list[float]:
+        """Generate embedding vector for a single text."""
+        response = await self.client.embeddings.create(
+            input=text,
+            model=self.model,
+        )
+        return response.data[0].embedding
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """Generate embedding vectors for multiple texts."""
+        response = await self.client.embeddings.create(
+            input=texts,
+            model=self.model,
+        )
+        return [d.embedding for d in response.data]
+
+
 # === Factory ===
 
 def get_llm_client(
@@ -323,3 +353,8 @@ def get_llm_client(
         return CerebrasClient(model=model or "llama-3.3-70b")
     else:
         raise ValueError(f"Unsupported provider: {provider}")
+
+
+def get_embedding_client(model: str | None = None) -> OpenAIEmbeddingClient:
+    """Get an embedding client (OpenAI)."""
+    return OpenAIEmbeddingClient(model=model or "text-embedding-3-small")

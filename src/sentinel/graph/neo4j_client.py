@@ -89,6 +89,13 @@ class Neo4jClient:
 
             logger.info("Neo4j schema setup complete")
 
+    async def query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        """Execute a raw Cypher query and return results as list of dicts."""
+        async with self.session() as session:
+            result = await session.run(cypher, params or {})
+            records = await result.data()
+            return records
+
     # === Node Operations ===
 
     async def create_node(self, node: BaseNode) -> str:
