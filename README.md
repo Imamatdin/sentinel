@@ -160,6 +160,24 @@ docker/             # Dockerfiles + compose
 tests/              # Unit + integration tests
 ```
 
+## Roadmap: 31 Levels (Tiers 1-5)
+
+Beyond the base platform (Phases 0-9), Sentinel has a planned roadmap of **31 research-driven feature levels** organized into 5 tiers:
+
+| Tier | Levels | Focus | Key Features |
+|------|--------|-------|--------------|
+| **Tier 1** | L01-L07 | Foundation Upgrades | EPSS scoring, Supply Chain scanning, Compliance reports, LLM cost optimization, K8s scanning, Change-based diff testing, WebSocket fuzzing |
+| **Tier 2** | L08-L13 | Intelligence Layer | Hybrid SAST (LLM+AST), Auto threat modeling, Predictive vuln scoring, Business logic testing, gRPC fuzzing, GraphRAG+HyDE |
+| **Tier 3** | L14-L19 | Advanced Capabilities | Auto-patch generator, Multi-agent debate, KG risk analytics, CTEM diff engine, Behavioral blue team, AI/LLM app security |
+| **Tier 4** | L20-L24 | Competitive Moat | MCP server, Federated learning, Formal verification, RL pentesting agent, Stackelberg game planner |
+| **Tier 5** | L25-L31 | Moonshots | FlipIt game, Wasm fuzzer, Active inference, Colonel Blotto allocator, Self-play red vs blue, Multi-tenancy, Benchmark harness |
+
+📁 **Level specifications:** See [`a_plan/`](a_plan/) directory for detailed implementation specs for each level.
+
+📄 **Level index:** [`a_plan/level-0-index.md`](a_plan/level-0-index.md)
+
+---
+
 ## License
 
 MIT
