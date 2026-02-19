@@ -1,208 +1,127 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type {
-  SentinelEvent,
-  EngagementState,
-  EngagementPhase,
-  EngagementResult,
-  SpeedStats,
-} from '@/lib/types';
-import { api } from '@/lib/api';
-import { SentinelWebSocket } from '@/lib/websocket';
-import { Header } from '@/components/Header';
-import { ControlPanel } from '@/components/ControlPanel';
-import { StatusBar } from '@/components/StatusBar';
-import { EventTimeline } from '@/components/EventTimeline';
-import { SpeedMetrics } from '@/components/SpeedMetrics';
-import { AgentPanel } from '@/components/AgentPanel';
-import { ReportViewer } from '@/components/ReportViewer';
+import Link from "next/link";
+import { useEngagements } from "@/hooks/useEngagement";
+import { useLiveFeed } from "@/hooks/useLiveFeed";
+import EngagementCard from "@/components/dashboard/EngagementCard";
+import LiveFeed from "@/components/dashboard/LiveFeed";
+import EmptyState from "@/components/shared/EmptyState";
+import LoadingSpinner from "@/components/shared/LoadingSpinner";
 
-export default function Dashboard() {
-  // Connection state
-  const [connected, setConnected] = useState(false);
-  const [juiceShopReachable, setJuiceShopReachable] = useState(false);
+export default function DashboardHome() {
+  const { engagements, isLoading } = useEngagements();
+  const { events, connected } = useLiveFeed();
 
-  // Engagement state
-  const [engState, setEngState] = useState<EngagementState>('idle');
-  const [phase, setPhase] = useState<EngagementPhase>(null);
-  const [eventCount, setEventCount] = useState(0);
-  const [elapsed, setElapsed] = useState<number | null>(null);
-
-  // Events
-  const [events, setEvents] = useState<SentinelEvent[]>([]);
-
-  // Result
-  const [result, setResult] = useState<EngagementResult | null>(null);
-  const [showReports, setShowReports] = useState(false);
-
-  // Speed stats (live updates)
-  const [liveSpeed, setLiveSpeed] = useState<Partial<SpeedStats>>({});
-
-  // WebSocket ref
-  const wsRef = useRef<SentinelWebSocket | null>(null);
-
-  // Health check on mount
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const health = await api.health();
-        setJuiceShopReachable(health.juice_shop_reachable);
-      } catch {
-        setJuiceShopReachable(false);
-      }
-    };
-    checkHealth();
-    const interval = setInterval(checkHealth, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // WebSocket setup
-  useEffect(() => {
-    const ws = new SentinelWebSocket({
-      onConnection: setConnected,
-
-      onEvent: (event) => {
-        setEvents((prev) => [...prev, event]);
-        setEventCount((c) => c + 1);
-      },
-
-      onState: (state, phase, count, elapsed) => {
-        setEngState(state);
-        setPhase(phase);
-        setEventCount(count);
-        setElapsed(elapsed);
-      },
-
-      onResult: (res) => {
-        setLiveSpeed(res.speed_stats);
-        // Fetch full result
-        api.getResult().then(setResult).catch(() => {});
-      },
-    });
-
-    ws.connect();
-    wsRef.current = ws;
-
-    return () => {
-      ws.disconnect();
-    };
-  }, []);
-
-  // Start engagement
-  const handleStart = useCallback(async (config: Record<string, unknown>) => {
-    try {
-      setEvents([]);
-      setResult(null);
-      setShowReports(false);
-      setLiveSpeed({});
-      await api.startEngagement(config);
-    } catch (err) {
-      console.error('Failed to start engagement:', err);
-    }
-  }, []);
-
-  // Stop engagement
-  const handleStop = useCallback(async () => {
-    try {
-      await api.stopEngagement();
-    } catch (err) {
-      console.error('Failed to stop engagement:', err);
-    }
-  }, []);
-
-  const isRunning = engState === 'running';
-  const isComplete = engState === 'completed' || engState === 'failed';
+  const activeEngagements = engagements.filter(
+    (e) => !["complete", "failed"].includes(e.status)
+  );
+  const recentEngagements = engagements
+    .filter((e) => ["complete", "failed"].includes(e.status))
+    .slice(0, 6);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header connected={connected} />
-
-      <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 py-4 space-y-4">
-        {/* Top row: Controls + Status */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <ControlPanel
-            state={engState}
-            juiceShopReachable={juiceShopReachable}
-            onStart={handleStart}
-            onStop={handleStop}
-          />
-          <div className="lg:col-span-2">
-            <StatusBar
-              state={engState}
-              phase={phase}
-              elapsed={elapsed}
-              eventCount={eventCount}
-            />
-          </div>
+    <div className="p-6 space-y-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-mono text-sentinel-bright">Dashboard</h1>
+          <p className="text-xs font-mono text-sentinel-muted mt-1">
+            {connected ? "Connected" : "Disconnected"} | {engagements.length} engagements
+          </p>
         </div>
+        <Link href="/engagements/new" className="btn-primary">
+          New Engagement
+        </Link>
+      </div>
 
-        {/* Main content: Timeline + Side panels */}
-        {(isRunning || isComplete) && (
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-            {/* Event Timeline - takes 3 columns */}
-            <div className="xl:col-span-3">
-              <EventTimeline events={events} isLive={isRunning} />
+      {isLoading ? (
+        <LoadingSpinner />
+      ) : (
+        <>
+          {/* Active engagements */}
+          {activeEngagements.length > 0 && (
+            <section>
+              <h2 className="text-sm font-mono text-sentinel-muted uppercase tracking-wider mb-3">
+                Active
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeEngagements.map((eng) => (
+                  <EngagementCard key={eng.id} engagement={eng} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Live feed */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <LiveFeed events={events} />
             </div>
-
-            {/* Side panel - speed metrics + agents */}
             <div className="space-y-4">
-              <SpeedMetrics
-                events={events}
-                speedStats={result?.speed_stats || liveSpeed}
-                isLive={isRunning}
-              />
-              {result && (
-                <AgentPanel agents={result.agents} />
-              )}
+              <div className="panel">
+                <div className="panel-header">Quick Stats</div>
+                <div className="p-4 grid grid-cols-2 gap-3">
+                  <StatBox label="Total" value={String(engagements.length)} />
+                  <StatBox label="Active" value={String(activeEngagements.length)} />
+                  <StatBox
+                    label="Findings"
+                    value={String(
+                      engagements.reduce(
+                        (sum, e) => sum + (e.summary?.findings_count || 0),
+                        0
+                      )
+                    )}
+                  />
+                  <StatBox
+                    label="Critical"
+                    value={String(
+                      engagements.reduce(
+                        (sum, e) => sum + (e.summary?.critical || 0),
+                        0
+                      )
+                    )}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          </section>
 
-        {/* Reports section (after completion) */}
-        {isComplete && result && (
-          <div>
-            <button
-              onClick={() => setShowReports(!showReports)}
-              className="mb-4 px-4 py-2 text-sm font-mono uppercase tracking-wider
-                         border border-sentinel-700 text-sentinel-300
-                         hover:bg-sentinel-800 transition-colors rounded"
-            >
-              {showReports ? 'Hide Reports' : 'View Reports'}
-            </button>
+          {/* Recent engagements */}
+          {recentEngagements.length > 0 && (
+            <section>
+              <h2 className="text-sm font-mono text-sentinel-muted uppercase tracking-wider mb-3">
+                Recent
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recentEngagements.map((eng) => (
+                  <EngagementCard key={eng.id} engagement={eng} />
+                ))}
+              </div>
+            </section>
+          )}
 
-            {showReports && (
-              <ReportViewer
-                redReport={result.red_report}
-                blueReport={result.blue_report}
-              />
-            )}
-          </div>
-        )}
+          {engagements.length === 0 && (
+            <EmptyState
+              title="No Engagements"
+              description="Create your first engagement to start pentesting."
+              action={
+                <Link href="/engagements/new" className="btn-primary">
+                  New Engagement
+                </Link>
+              }
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
-        {/* Idle state - show instructions */}
-        {engState === 'idle' && (
-          <div className="panel">
-            <div className="p-12 text-center">
-              <p className="text-sentinel-500 font-mono text-sm uppercase tracking-widest mb-4">
-                Ready
-              </p>
-              <p className="text-sentinel-400 text-lg max-w-xl mx-auto leading-relaxed">
-                Configure engagement parameters above and start the assessment.
-                Events will stream here in real-time as red team agents attack
-                and blue team agents defend.
-              </p>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-sentinel-900 py-3 px-4 text-center">
-        <p className="text-sentinel-600 text-xs font-mono">
-          SENTINEL v0.1.0 &middot; Powered by Cerebras Inference
-        </p>
-      </footer>
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-xl font-mono text-sentinel-bright">{value}</div>
+      <div className="text-[10px] font-mono text-sentinel-muted uppercase">{label}</div>
     </div>
   );
 }

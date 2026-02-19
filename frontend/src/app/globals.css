@@ -2,45 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
 @layer base {
   body {
-    @apply bg-sentinel-950 text-sentinel-100 font-sans antialiased;
+    @apply bg-sentinel-bg text-sentinel-text font-sans antialiased;
   }
 
-  /* Scrollbar styling - monochrome */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-sentinel-900;
+    background: #0A0A0A;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-sentinel-600 rounded-full;
+    @apply bg-sentinel-muted rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-sentinel-500;
+    background: #525252;
   }
 
-  /* Selection - monochrome */
   ::selection {
-    @apply bg-sentinel-300 text-sentinel-900;
+    background: #404040;
+    color: #FFFFFF;
   }
 }
 
 @layer components {
   .panel {
-    @apply bg-sentinel-900 border border-sentinel-800 rounded-lg;
+    @apply bg-sentinel-surface border border-sentinel-border rounded-lg;
   }
 
   .panel-header {
-    @apply px-4 py-3 border-b border-sentinel-800 font-medium text-sm uppercase tracking-wider text-sentinel-400;
+    @apply px-4 py-3 border-b border-sentinel-border font-medium text-sm uppercase tracking-wider text-sentinel-muted font-mono;
   }
 
   .panel-body {
@@ -52,24 +50,37 @@
   }
 
   .badge-red {
-    @apply border-sentinel-600 text-sentinel-300 bg-sentinel-800;
+    @apply border-red-800 text-red-400 bg-red-950;
   }
 
   .badge-blue {
-    @apply border-sentinel-500 text-sentinel-200 bg-sentinel-800/50;
+    @apply border-blue-800 text-blue-400 bg-blue-950;
   }
 
   .badge-system {
-    @apply border-sentinel-700 text-sentinel-500 bg-sentinel-900;
+    @apply border-sentinel-border text-sentinel-muted bg-sentinel-bg;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 text-sm font-mono bg-sentinel-bright text-sentinel-bg rounded
+           hover:bg-sentinel-text transition-colors;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 text-sm font-mono border border-sentinel-border text-sentinel-text rounded
+           hover:bg-sentinel-surface transition-colors;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2 text-sm font-mono bg-red-900 text-red-200 border border-red-800 rounded
+           hover:bg-red-800 transition-colors;
   }
 }
 
-/* Event timeline auto-scroll */
 .timeline-scroll {
   scroll-behavior: smooth;
 }
 
-/* Monospace code blocks */
 .code-block {
-  @apply font-mono text-xs leading-relaxed bg-sentinel-950 border border-sentinel-800 rounded p-3 overflow-x-auto;
+  @apply font-mono text-xs leading-relaxed bg-sentinel-bg border border-sentinel-border rounded p-3 overflow-x-auto;
 }
