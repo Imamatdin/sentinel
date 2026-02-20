@@ -8,18 +8,22 @@ interface Props {
 }
 
 export default function LiveFeed({ events, maxItems = 50 }: Props) {
-  const displayEvents = events.slice(0, maxItems);
+  // Filter out malformed events (missing timestamp or type)
+  const validEvents = events.filter(
+    (e) => e.timestamp && e.type && !isNaN(new Date(e.timestamp).getTime())
+  );
+  const displayEvents = validEvents.slice(0, maxItems);
 
   return (
     <div className="panel">
       <div className="panel-header flex items-center justify-between">
         <span>Live Feed</span>
-        <span className="text-[10px] text-sentinel-muted">{events.length} events</span>
+        <span className="text-[10px] text-sentinel-muted">{validEvents.length} events</span>
       </div>
       <div className="max-h-[400px] overflow-y-auto timeline-scroll">
         {displayEvents.length === 0 ? (
           <div className="p-4 text-center text-sm text-sentinel-muted font-mono">
-            No events yet
+            No events yet. Start the engagement to see live activity.
           </div>
         ) : (
           displayEvents.map((event, i) => (

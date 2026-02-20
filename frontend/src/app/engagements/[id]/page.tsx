@@ -27,6 +27,8 @@ export default function EngagementDetailPage() {
   }
 
   const isPaused = engagement.status === "paused";
+  const isRunning = ["reconnaissance", "vulnerability_analysis", "exploitation", "reporting"].includes(engagement.status);
+  const isInitialized = engagement.status === "initialized";
   const isActive = !["complete", "failed"].includes(engagement.status);
 
   const severityCounts = {
@@ -35,6 +37,10 @@ export default function EngagementDetailPage() {
     medium: engagement.summary?.medium || 0,
     low: engagement.summary?.low || 0,
     info: 0,
+  };
+
+  const handleStart = async () => {
+    await api.engagements.start(id);
   };
 
   const handleApprove = async (approved: boolean) => {
@@ -56,6 +62,11 @@ export default function EngagementDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {isInitialized && (
+            <button onClick={handleStart} className="btn-primary">
+              Start Engagement
+            </button>
+          )}
           {isPaused && (
             <>
               <button onClick={() => handleApprove(true)} className="btn-primary">
@@ -66,7 +77,7 @@ export default function EngagementDetailPage() {
               </button>
             </>
           )}
-          {isActive && !isPaused && (
+          {isRunning && (
             <button onClick={handleStop} className="btn-danger">
               Stop
             </button>

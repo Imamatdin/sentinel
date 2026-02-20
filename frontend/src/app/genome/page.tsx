@@ -29,19 +29,19 @@ export default function GenomePage() {
         <div className="panel p-4">
           <div className="text-xs text-sentinel-muted font-mono uppercase">Avg Confidence</div>
           <div className="text-2xl font-mono text-sentinel-bright mt-1">
-            {(stats.avg_confidence * 100).toFixed(1)}%
+            {((stats.avg_confidence || 0) * 100).toFixed(1)}%
           </div>
         </div>
         <div className="panel p-4">
           <div className="text-xs text-sentinel-muted font-mono uppercase">Categories</div>
           <div className="text-2xl font-mono text-sentinel-bright mt-1">
-            {Object.keys(stats.by_category).length}
+            {Object.keys(stats.by_category || {}).length}
           </div>
         </div>
         <div className="panel p-4">
           <div className="text-xs text-sentinel-muted font-mono uppercase">Learning Rate</div>
           <div className="text-2xl font-mono text-sentinel-bright mt-1">
-            {stats.learning_rate.toFixed(1)}/eng
+            {(stats.learning_rate || 0).toFixed(1)}/eng
           </div>
         </div>
       </div>
@@ -50,8 +50,8 @@ export default function GenomePage() {
       <div className="panel">
         <div className="panel-header">Patterns by Category</div>
         <div className="p-4 space-y-2">
-          {Object.entries(stats.by_category)
-            .sort(([, a], [, b]) => b - a)
+          {Object.entries(stats.by_category || {})
+            .sort(([, a], [, b]) => (b as number) - (a as number))
             .map(([category, count]) => (
               <div key={category} className="flex items-center gap-3 text-xs font-mono">
                 <span className="text-sentinel-text w-40">{category}</span>
@@ -59,22 +59,22 @@ export default function GenomePage() {
                   <div
                     className="h-2 rounded-full bg-sentinel-muted"
                     style={{
-                      width: `${(count / stats.total_patterns) * 100}%`,
+                      width: `${((count as number) / stats.total_patterns) * 100}%`,
                     }}
                   />
                 </div>
-                <span className="text-sentinel-muted w-8 text-right">{count}</span>
+                <span className="text-sentinel-muted w-8 text-right">{count as number}</span>
               </div>
             ))}
         </div>
       </div>
 
       {/* Top techniques */}
-      {stats.top_techniques.length > 0 && (
+      {(stats.top_techniques || []).length > 0 && (
         <div className="panel">
           <div className="panel-header">Top Techniques</div>
           <div className="p-4 space-y-2">
-            {stats.top_techniques.map((tech) => (
+            {(stats.top_techniques || []).map((tech) => (
               <div
                 key={tech.category}
                 className="flex items-center gap-3 text-xs font-mono"

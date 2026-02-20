@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 export default function NewEngagementPage() {
   const router = useRouter();
   const [targetUrl, setTargetUrl] = useState("http://localhost:3000");
-  const [requireApproval, setRequireApproval] = useState(true);
+  const [requireApproval, setRequireApproval] = useState(false);
   const [scanDepth, setScanDepth] = useState(3);
   const [llmProvider, setLlmProvider] = useState("cerebras");
   const [excludedPaths, setExcludedPaths] = useState("");

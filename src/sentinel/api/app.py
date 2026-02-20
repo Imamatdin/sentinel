@@ -19,7 +19,7 @@ from sentinel.config import Settings, get_settings
 from sentinel.api.routes import router, get_manager
 from sentinel.api.genome_routes import router as genome_router
 from sentinel.api.export_routes import router as export_router
-from sentinel.api.dashboard_routes import router as dashboard_router
+from sentinel.api.dashboard_routes import router as dashboard_router, dashboard_websocket_handler
 from sentinel.api.websocket import websocket_handler
 from sentinel.api.manager import EngagementManager
 from sentinel.logging_config import setup_logging, get_logger
@@ -106,8 +106,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     # WebSocket endpoint (not under /api prefix for cleaner URL)
     @app.websocket("/ws")
     async def ws_endpoint(websocket: WebSocket):
-        mgr = _get_manager()
-        await websocket_handler(websocket, mgr)
+        await dashboard_websocket_handler(websocket)
 
     return app
 
