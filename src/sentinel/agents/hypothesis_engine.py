@@ -13,6 +13,7 @@ from typing import Optional
 import uuid
 
 from sentinel.graph.neo4j_client import Neo4jClient
+from sentinel.intel.epss_client import EPSSClient
 from sentinel.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -36,6 +37,7 @@ class HypothesisCategory(str, Enum):
     MISCONFIG = "misconfig"         # Security misconfiguration
     SENSITIVE_DATA = "sensitive_data"   # Sensitive data exposure
     BROKEN_ACCESS = "broken_access"     # Broken access control
+    SUPPLY_CHAIN = "supply_chain"       # Vulnerable dependencies, confusion attacks
 
 
 @dataclass
@@ -54,6 +56,7 @@ class VulnHypothesis:
     risk_level: str         # LOW, MEDIUM, HIGH, CRITICAL
     priority_score: float   # 0.0-1.0, used for ordering
     mitre_technique: str = ""  # MITRE ATT&CK technique ID
+    cve_id: str = ""        # CVE identifier if hypothesis maps to a known CVE
     dependencies: list[str] = field(default_factory=list)  # Hypothesis IDs this depends on
 
 
@@ -72,6 +75,7 @@ class HypothesisEngine:
     def __init__(self, graph_client: Neo4jClient, llm_client=None):
         self.graph = graph_client
         self.llm = llm_client
+        self.epss = EPSSClient()
         self._rules = self._load_hypothesis_rules()
 
     async def generate_hypotheses(self, engagement_id: str) -> list[VulnHypothesis]:
@@ -108,7 +112,37 @@ class HypothesisEngine:
         hypotheses = self._deduplicate(hypotheses)
         hypotheses = self._rank(hypotheses)
 
+        # 5. Enrich with EPSS scores and re-sort
+        hypotheses = await self._enrich_with_epss(hypotheses)
+
         logger.info(f"Generated {len(hypotheses)} hypotheses for engagement {engagement_id}")
+        return hypotheses
+
+    async def _enrich_with_epss(self, hypotheses: list[VulnHypothesis]) -> list[VulnHypothesis]:
+        """Boost hypothesis priority if linked CVE has high EPSS score."""
+        # Collect CVE IDs from hypotheses that reference known CVEs
+        cve_map: dict[str, list[VulnHypothesis]] = {}
+        for h in hypotheses:
+            if h.cve_id:
+                cve_map.setdefault(h.cve_id, []).append(h)
+
+        if not cve_map:
+            return hypotheses
+
+        try:
+            scores = await self.epss.get_scores_bulk(list(cve_map.keys()))
+
+            for cve_id, score in scores.items():
+                for h in cve_map.get(cve_id, []):
+                    # Boost: multiply by (1 + epss_percentile) so high-EPSS vulns jump up
+                    # A CVE at 99th percentile gets ~2x priority boost
+                    h.priority_score *= (1.0 + score.percentile)
+
+            # Re-sort after EPSS boost
+            hypotheses = sorted(hypotheses, key=lambda h: h.priority_score, reverse=True)
+        except Exception as e:
+            logger.warning(f"EPSS enrichment failed (continuing without): {e}")
+
         return hypotheses
 
     def _load_hypothesis_rules(self) -> list[dict]:
@@ -162,6 +196,11 @@ class HypothesisEngine:
                 "pattern": {"param_contains": ["search", "q", "query", "name", "comment"]},
                 "generates": [HypothesisCategory.XSS, HypothesisCategory.INJECTION],
                 "confidence": HypothesisConfidence.MEDIUM,
+            },
+            {
+                "pattern": {"has_vulnerable_deps": True},
+                "generates": [HypothesisCategory.SUPPLY_CHAIN],
+                "confidence": HypothesisConfidence.HIGH,
             },
         ]
 
@@ -241,13 +280,15 @@ class HypothesisEngine:
             HypothesisCategory.MISCONFIG: ["nuclei_scan", "zap_scan"],
             HypothesisCategory.SENSITIVE_DATA: ["zap_scan"],
             HypothesisCategory.BROKEN_ACCESS: ["idor_tool", "zap_scan"],
+            HypothesisCategory.SUPPLY_CHAIN: ["sca_scan"],
         }
         return tool_map.get(category, ["nuclei_scan"])
 
     def _get_risk_level(self, category: HypothesisCategory) -> str:
         """Map category to risk level."""
         high_risk = [HypothesisCategory.INJECTION, HypothesisCategory.AUTH_BYPASS,
-                     HypothesisCategory.SSRF, HypothesisCategory.DESERIALIZATION]
+                     HypothesisCategory.SSRF, HypothesisCategory.DESERIALIZATION,
+                     HypothesisCategory.SUPPLY_CHAIN]
         medium_risk = [HypothesisCategory.XSS, HypothesisCategory.IDOR,
                        HypothesisCategory.FILE_UPLOAD, HypothesisCategory.XXE,
                        HypothesisCategory.BROKEN_ACCESS]
@@ -300,6 +341,7 @@ class HypothesisEngine:
             HypothesisCategory.XSS: 0.7,
             HypothesisCategory.SENSITIVE_DATA: 0.6,
             HypothesisCategory.MISCONFIG: 0.5,
+            HypothesisCategory.SUPPLY_CHAIN: 0.9,
         }
 
         confidence_weights = {

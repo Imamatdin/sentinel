@@ -603,6 +603,20 @@ async def analyze_service_vulns(service_id: str, engagement_id: str) -> list[str
             )
             await graph.create_node(vuln)
 
+            # Enrich with EPSS score if CVE ID is available
+            if vuln.cve_id:
+                try:
+                    from sentinel.intel.epss_client import EPSSClient
+                    epss = EPSSClient()
+                    epss_score = await epss.get_score(vuln.cve_id)
+                    if epss_score:
+                        await graph.update_node(
+                            str(vuln.id), NodeType.VULNERABILITY,
+                            {"epss_score": epss_score.epss, "epss_percentile": epss_score.percentile},
+                        )
+                except Exception as epss_err:
+                    logger.debug(f"EPSS enrichment skipped for {vuln.cve_id}: {epss_err}")
+
             edge = BaseEdge(
                 edge_type=EdgeType.HAS_VULNERABILITY,
                 source_id=service_id,
