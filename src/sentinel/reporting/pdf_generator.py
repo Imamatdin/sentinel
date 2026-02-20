@@ -26,6 +26,7 @@ from typing import Any, Optional
 from jinja2 import Environment, FileSystemLoader
 
 from sentinel.genome.models import VulnPattern
+from sentinel.compliance.report_generator import ComplianceReportGenerator
 
 logger = logging.getLogger("sentinel.reporting.pdf")
 
@@ -140,6 +141,9 @@ class PDFReportGenerator:
             "genome_patterns": [
                 p.model_dump() for p in (genome_patterns or [])
             ],
+
+            # Compliance appendix
+            "compliance": self._build_compliance(all_findings, result),
         }
 
         # Render HTML
@@ -162,3 +166,57 @@ class PDFReportGenerator:
             return html_path
 
         return output_path
+
+    def _build_compliance(
+        self, findings: list[dict[str, Any]], result: Any
+    ) -> dict[str, Any] | None:
+        """Build compliance appendix data from findings."""
+        if not findings:
+            return None
+        try:
+            gen = ComplianceReportGenerator()
+            engagement_id = getattr(result, "engagement_id", "unknown")
+            # Normalize findings to have category field
+            normalized = []
+            for f in findings:
+                category = f.get("category", "")
+                if not category:
+                    # Infer category from finding type/title
+                    title = f.get("type", f.get("title", "")).lower()
+                    if "inject" in title or "sqli" in title:
+                        category = "injection"
+                    elif "xss" in title or "cross-site" in title:
+                        category = "xss"
+                    elif "idor" in title:
+                        category = "idor"
+                    elif "ssrf" in title:
+                        category = "ssrf"
+                    elif "auth" in title:
+                        category = "auth_bypass"
+                    elif "config" in title:
+                        category = "misconfig"
+                normalized.append({
+                    "finding_id": f.get("id", ""),
+                    "category": category,
+                    "severity": f.get("severity", "info"),
+                    "target_url": f.get("endpoint", f.get("url", "")),
+                })
+            report = gen.generate(normalized, engagement_id)
+            return {
+                "frameworks": report.frameworks_covered,
+                "entries": [
+                    {
+                        "finding_id": e.finding_id,
+                        "category": e.category,
+                        "severity": e.severity,
+                        "target": e.target,
+                        "controls": e.controls,
+                    }
+                    for e in report.entries
+                ],
+                "coverage_stats": report.coverage_stats,
+                "control_summary": report.control_summary,
+            }
+        except Exception as e:
+            logger.warning(f"compliance_appendix_failed: {e}")
+            return None
