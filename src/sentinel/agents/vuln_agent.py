@@ -61,6 +61,7 @@ class GuardedVulnAgent(GuardedBaseAgent):
         HypothesisCategory.MISCONFIG: ["nuclei_scan", "zap_scan"],
         HypothesisCategory.SENSITIVE_DATA: ["zap_scan"],
         HypothesisCategory.BROKEN_ACCESS: ["idor_tool", "zap_scan"],
+        HypothesisCategory.SUPPLY_CHAIN: ["sca_scan"],
     }
 
     def __init__(self, graph_client: Neo4jClient, llm_client, policy_engine):
