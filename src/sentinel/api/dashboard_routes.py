@@ -865,3 +865,14 @@ async def get_cis_mapping(engagement_id: str) -> list[dict[str, Any]]:
 @router.get("/engagements/{engagement_id}/report/download")
 async def download_report(engagement_id: str) -> dict[str, str]:
     raise HTTPException(status_code=404, detail="No report generated yet")
+
+
+# ---------------------------------------------------------------------------
+# Cost tracking
+# ---------------------------------------------------------------------------
+@router.get("/costs")
+async def get_costs() -> dict[str, Any]:
+    """Return LLM cost breakdown from the model router."""
+    from sentinel.llm.model_router import ModelRouter
+    r = ModelRouter()
+    return r.get_cost_summary()
