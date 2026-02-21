@@ -20,6 +20,7 @@ from sentinel.api.routes import router, get_manager
 from sentinel.api.genome_routes import router as genome_router
 from sentinel.api.export_routes import router as export_router
 from sentinel.api.dashboard_routes import router as dashboard_router, dashboard_websocket_handler
+from sentinel.cicd.webhook_handler import router as webhook_router
 from sentinel.api.websocket import websocket_handler
 from sentinel.api.manager import EngagementManager
 from sentinel.logging_config import setup_logging, get_logger
@@ -102,6 +103,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.include_router(genome_router, prefix="/api/genome", tags=["genome"])
     app.include_router(export_router, prefix="/api/export", tags=["export"])
     app.include_router(dashboard_router, prefix="/api", tags=["dashboard"])
+    app.include_router(webhook_router, prefix="/api/v1", tags=["cicd"])
 
     # WebSocket endpoint (not under /api prefix for cleaner URL)
     @app.websocket("/ws")
