@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c:*)",
+      "Bash(git diff:*)",
+      "Bash(npx next build:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(where:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix dashboard glue layer: wire Neo4j to REST API\n\nFindings, attack graph, and engagement summary now query Neo4j\ninstead of reading from empty in-memory dicts. The workflow monitor\nsyncs summary every 2s and emits finding/phase events. Stop endpoint\ncancels the Temporal workflow. OWASP mapping queries real findings.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(poetry run:*)",
+      "Bash(pip install:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}

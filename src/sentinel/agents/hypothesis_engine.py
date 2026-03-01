@@ -38,6 +38,9 @@ class HypothesisCategory(str, Enum):
     SENSITIVE_DATA = "sensitive_data"   # Sensitive data exposure
     BROKEN_ACCESS = "broken_access"     # Broken access control
     SUPPLY_CHAIN = "supply_chain"       # Vulnerable dependencies, confusion attacks
+    PROMPT_INJECTION = "prompt_injection"   # LLM prompt injection (direct + indirect)
+    TOOL_POISONING = "tool_poisoning"       # MCP/tool-use poisoning, excessive agency
+    RAG_POISONING = "rag_poisoning"         # RAG indirect prompt injection
 
 
 @dataclass
@@ -58,6 +61,7 @@ class VulnHypothesis:
     mitre_technique: str = ""  # MITRE ATT&CK technique ID
     cve_id: str = ""        # CVE identifier if hypothesis maps to a known CVE
     dependencies: list[str] = field(default_factory=list)  # Hypothesis IDs this depends on
+    source: str = "rules"  # "rules", "sast", "llm" — where this hypothesis originated
 
 
 class HypothesisEngine:
@@ -202,6 +206,19 @@ class HypothesisEngine:
                 "generates": [HypothesisCategory.SUPPLY_CHAIN],
                 "confidence": HypothesisConfidence.HIGH,
             },
+            {
+                "pattern": {"has_ai_endpoint": True},
+                "generates": [
+                    HypothesisCategory.PROMPT_INJECTION,
+                    HypothesisCategory.RAG_POISONING,
+                ],
+                "confidence": HypothesisConfidence.HIGH,
+            },
+            {
+                "pattern": {"has_mcp_tools": True},
+                "generates": [HypothesisCategory.TOOL_POISONING],
+                "confidence": HypothesisConfidence.MEDIUM,
+            },
         ]
 
     def _apply_rules(self, endpoint: dict) -> list[VulnHypothesis]:
@@ -240,6 +257,12 @@ class HypothesisEngine:
                     if keyword.lower() in content_type.lower():
                         matched = True
                         break
+
+            # Check boolean flag patterns (has_vulnerable_deps, has_ai_endpoint, etc.)
+            for key in ("has_vulnerable_deps", "has_ai_endpoint", "has_mcp_tools"):
+                if key in pattern and pattern[key] is True:
+                    if endpoint.get(key) is True:
+                        matched = True
 
             # Generate hypotheses if pattern matched
             if matched:
@@ -281,6 +304,9 @@ class HypothesisEngine:
             HypothesisCategory.SENSITIVE_DATA: ["zap_scan"],
             HypothesisCategory.BROKEN_ACCESS: ["idor_tool", "zap_scan"],
             HypothesisCategory.SUPPLY_CHAIN: ["sca_scan"],
+            HypothesisCategory.PROMPT_INJECTION: ["prompt_injection_test"],
+            HypothesisCategory.TOOL_POISONING: ["tool_poisoning_detect"],
+            HypothesisCategory.RAG_POISONING: ["rag_poison_test"],
         }
         return tool_map.get(category, ["nuclei_scan"])
 
@@ -288,10 +314,13 @@ class HypothesisEngine:
         """Map category to risk level."""
         high_risk = [HypothesisCategory.INJECTION, HypothesisCategory.AUTH_BYPASS,
                      HypothesisCategory.SSRF, HypothesisCategory.DESERIALIZATION,
-                     HypothesisCategory.SUPPLY_CHAIN]
+                     HypothesisCategory.SUPPLY_CHAIN,
+                     HypothesisCategory.PROMPT_INJECTION]
         medium_risk = [HypothesisCategory.XSS, HypothesisCategory.IDOR,
                        HypothesisCategory.FILE_UPLOAD, HypothesisCategory.XXE,
-                       HypothesisCategory.BROKEN_ACCESS]
+                       HypothesisCategory.BROKEN_ACCESS,
+                       HypothesisCategory.TOOL_POISONING,
+                       HypothesisCategory.RAG_POISONING]
 
         if category in high_risk:
             return "HIGH"
@@ -307,6 +336,55 @@ class HypothesisEngine:
         # Parse structured output into VulnHypothesis objects
         # TODO: Implement LLM-based hypothesis generation in Phase 7
         return []
+
+    async def generate_from_sast(
+        self, sast_findings: list, base_url: str
+    ) -> list[VulnHypothesis]:
+        """Generate hypotheses from SAST findings (higher priority than pattern-based).
+
+        Args:
+            sast_findings: list of SASTFinding objects from the SAST analyzer.
+            base_url: base URL of the target application.
+        """
+        from sentinel.sast.dast_bridge import SASTtoDAST
+
+        bridge = SASTtoDAST()
+        targeted = bridge.convert(sast_findings, base_url)
+
+        hypotheses: list[VulnHypothesis] = []
+        for t in targeted:
+            category_str = t.test_category
+            try:
+                category = HypothesisCategory(category_str)
+            except ValueError:
+                category = HypothesisCategory.INJECTION
+
+            h = VulnHypothesis(
+                id=str(uuid.uuid4()),
+                category=category,
+                confidence=HypothesisConfidence.HIGH
+                if t.priority >= 1.0
+                else HypothesisConfidence.MEDIUM,
+                target_url=t.target_url,
+                target_param=t.parameter or None,
+                description=t.source_finding.description,
+                rationale=f"SAST found {t.source_finding.vuln_type} at "
+                f"{t.source_finding.file_path}:{t.source_finding.line}",
+                test_plan=[
+                    f"Send {t.method} to {t.target_url}",
+                    f"Use payloads: {t.payload_hints[:3]}",
+                    "Verify response for vulnerability indicators",
+                ],
+                required_tools=[t.test_category],
+                expected_evidence=t.source_finding.exploit_hint,
+                risk_level=self._risk_level(category),
+                priority_score=min(t.priority, 1.0),
+                cve_id=t.source_finding.cwe_id,
+                source="sast",
+            )
+            hypotheses.append(h)
+
+        return hypotheses
 
     def _deduplicate(self, hypotheses: list[VulnHypothesis]) -> list[VulnHypothesis]:
         """Remove duplicate hypotheses targeting same vuln on same endpoint."""
@@ -342,6 +420,9 @@ class HypothesisEngine:
             HypothesisCategory.SENSITIVE_DATA: 0.6,
             HypothesisCategory.MISCONFIG: 0.5,
             HypothesisCategory.SUPPLY_CHAIN: 0.9,
+            HypothesisCategory.PROMPT_INJECTION: 0.9,
+            HypothesisCategory.TOOL_POISONING: 0.85,
+            HypothesisCategory.RAG_POISONING: 0.85,
         }
 
         confidence_weights = {

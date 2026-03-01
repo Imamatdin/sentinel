@@ -62,6 +62,9 @@ class GuardedVulnAgent(GuardedBaseAgent):
         HypothesisCategory.SENSITIVE_DATA: ["zap_scan"],
         HypothesisCategory.BROKEN_ACCESS: ["idor_tool", "zap_scan"],
         HypothesisCategory.SUPPLY_CHAIN: ["sca_scan"],
+        HypothesisCategory.PROMPT_INJECTION: ["prompt_injection_test"],
+        HypothesisCategory.TOOL_POISONING: ["tool_poisoning_detect"],
+        HypothesisCategory.RAG_POISONING: ["rag_poison_test"],
     }
 
     def __init__(self, graph_client: Neo4jClient, llm_client, policy_engine):

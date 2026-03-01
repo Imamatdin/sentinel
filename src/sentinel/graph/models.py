@@ -28,6 +28,7 @@ class NodeType(str, Enum):
     TOKEN = "Token"
     ENDPOINT = "Endpoint"
     CRITICAL_ASSET = "CriticalAsset"
+    PATCH = "Patch"
 
 
 class EdgeType(str, Enum):
@@ -44,6 +45,7 @@ class EdgeType(str, Enum):
     HAS_ENDPOINT = "HAS_ENDPOINT"
     ACCESSES = "ACCESSES"
     LEADS_TO = "LEADS_TO"
+    HAS_PATCH = "HAS_PATCH"
 
 
 class Severity(str, Enum):

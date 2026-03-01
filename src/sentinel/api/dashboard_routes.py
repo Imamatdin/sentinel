@@ -60,6 +60,13 @@ class GenerateReportRequest(BaseModel):
     type: str = "executive"
 
 
+class PatchRequest(BaseModel):
+    source_code: str
+    file_path: str
+    poc_script: str | None = None
+    framework: str = "generic"
+
+
 class GenomeIntelRequest(BaseModel):
     tech_stack: list[str]
 
@@ -713,6 +720,92 @@ async def retest_finding(finding_id: str) -> dict[str, str]:
     except Exception as e:
         logger.warning(f"Failed to queue retest: {e}")
         raise HTTPException(status_code=500, detail="Failed to queue retest")
+
+
+@router.post("/findings/{finding_id}/patch")
+async def generate_patch(finding_id: str, req: PatchRequest) -> dict[str, Any]:
+    """Generate an auto-patch for a finding, verify it, and store in Neo4j."""
+    # Fetch finding from Neo4j
+    try:
+        graph = await _get_graph()
+        node = await graph.get_node(finding_id, NodeType.VULNERABILITY)
+        if not node:
+            raise HTTPException(status_code=404, detail="Finding not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Finding not found: {e}")
+
+    finding = {
+        "id": finding_id,
+        "category": node.get("name", "unknown"),
+        "severity": node.get("severity", "medium"),
+        "evidence": node.get("evidence", node.get("description", "")),
+    }
+
+    # Generate patch
+    from sentinel.llm.model_router import ModelRouter, TaskType
+    from sentinel.remediation import PatchGenerator
+
+    router_inst = ModelRouter()
+    gen = PatchGenerator(router=router_inst)
+    result = await gen.generate_patch(
+        finding=finding,
+        source_code=req.source_code,
+        file_path=req.file_path,
+        poc_script=req.poc_script,
+        framework=req.framework,
+    )
+
+    # Store Patch node in Neo4j with HAS_PATCH edge
+    try:
+        from sentinel.graph.models import EdgeType
+        patch_id = str(uuid4())
+        await graph.query(
+            """
+            CREATE (p:Patch {
+                id: $patch_id,
+                finding_id: $finding_id,
+                status: $status,
+                final_diff: $diff,
+                confidence: $confidence,
+                target_file: $target_file,
+                vuln_category: $category,
+                verification_report: $report,
+                created_at: $created_at,
+                engagement_id: $eid
+            })
+            WITH p
+            MATCH (v:Vulnerability {id: $finding_id})
+            CREATE (v)-[:HAS_PATCH]->(p)
+            """,
+            {
+                "patch_id": patch_id,
+                "finding_id": finding_id,
+                "status": result.status.value,
+                "diff": result.final_diff,
+                "confidence": result.confidence,
+                "target_file": result.target_file,
+                "category": result.vuln_category,
+                "report": result.verification_report,
+                "created_at": _now(),
+                "eid": node.get("engagement_id", ""),
+            },
+        )
+    except Exception as e:
+        logger.warning(f"Failed to store patch in Neo4j: {e}")
+
+    return {
+        "finding_id": result.finding_id,
+        "status": result.status.value,
+        "final_diff": result.final_diff,
+        "confidence": result.confidence,
+        "target_file": result.target_file,
+        "vuln_category": result.vuln_category,
+        "verification_report": result.verification_report,
+        "framework_template_used": result.framework_template_used,
+        "iterations": len(result.attempts),
+    }
 
 
 # ── Attack Graph (backed by Neo4j) ───────────────────────────────────

@@ -20,7 +20,7 @@ Integration:
 
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from jinja2 import Environment, FileSystemLoader
@@ -100,7 +100,7 @@ class PDFReportGenerator:
 
         context = {
             "target_url": getattr(result, "target_url", "unknown"),
-            "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             "duration": getattr(result, "duration", 0),
             "event_count": getattr(result, "event_count", 0),
             "success": getattr(result, "success", False),
