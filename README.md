@@ -139,6 +139,18 @@ Expose SENTINEL to external AI agents:
 - **Orchestrator Tools**: Full engagement execution for complex scenarios
 - **OAuth2 Authentication**: Secure API access with scoped permissions
 
+### Public Benchmark Harness
+
+Transparent, reproducible benchmarks to prove SENTINEL's capabilities:
+
+- **Benchmark Targets**: Built-in intentionally vulnerable apps (OWASP Juice Shop, DVWA, Custom API) with ground truth vulnerability databases, difficulty ratings, domain tags, and negative controls
+- **Ground Truth Scoring**: Precision, recall, and F1 computed against known vulnerabilities with exact category + location + parameter matching
+- **Negative Controls**: Known-clean endpoints tracked separately to prevent false-positive inflation
+- **Path Parameter Matching**: Smart matching supports parameterized paths (e.g., `/api/items/42` matches `/api/items/{id}`)
+- **Community Registry**: Researchers can register custom challenge targets via `TargetRegistry.register()`
+- **Suite Runner**: Orchestrates deploy, scan, score, and teardown across all targets with aggregate metrics
+- **CI/CD Integration**: Every PR runs against the benchmark suite for regression detection
+
 ---
 
 ## Architecture
@@ -275,6 +287,7 @@ cd frontend && npm install && npm run dev
 sentinel/
 ├── agents/              # AI agents: recon, vuln, exploit, defense, debate
 ├── api/                 # FastAPI routes and middleware
+├── benchmark/           # Public benchmark harness: targets, scorer, runner
 ├── blue_team/           # Behavioral detection, adaptive WAF, tripwires
 ├── core/                # Cerebras client, configuration, logging
 ├── ctem/                # Continuous Threat Exposure Management, diff engine

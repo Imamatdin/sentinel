@@ -73,18 +73,19 @@ class BenchmarkScorer:
         false_positives: list[str] = []
 
         for finding in findings:
+            # Check negative controls first -- any hit here is unconditionally a FP
+            if self._is_negative_control(finding, target.negative_controls):
+                false_positives.append(f"FP on negative control: {finding.location}")
+                continue
+
             best_match = self._find_match(finding, target.ground_truth, matched_gt_ids)
             if best_match:
                 matches.append(best_match)
                 matched_gt_ids.add(best_match.ground_truth_id)
             else:
-                is_negative = self._is_negative_control(finding, target.negative_controls)
-                if is_negative:
-                    false_positives.append(f"FP on negative control: {finding.location}")
-                else:
-                    false_positives.append(
-                        f"Unknown finding: {finding.category} at {finding.location}"
-                    )
+                false_positives.append(
+                    f"Unknown finding: {finding.category} at {finding.location}"
+                )
 
         tp = len(matches)
         fp = len(false_positives)
@@ -160,8 +161,8 @@ class BenchmarkScorer:
     def _is_negative_control(
         self, finding: Finding, controls: list[NegativeControl]
     ) -> bool:
-        """Check if a finding hits a negative control endpoint."""
+        """Check if a finding hits a negative control endpoint (exact match)."""
         for nc in controls:
-            if nc.endpoint in finding.location:
+            if finding.location == nc.endpoint:
                 return True
         return False
