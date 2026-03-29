@@ -1,5 +1,19 @@
 # SENTINEL
 
+## See It In Action
+
+[![Demo Video](https://img.shields.io/badge/Demo_Video-Watch_on_YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/Brt9Gc0DOWs)
+
+Full walkthrough of SENTINEL running an autonomous pentest against a live target, from reconnaissance through exploitation and remediation.
+
+[![Presentation](https://img.shields.io/badge/Presentation-Watch_on_YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/GhNRpu45puM)
+
+Technical deep dive into the architecture, agent design, and federated learning pipeline.
+
+75,000+ lines of production Python and TypeScript. Autonomous red and blue agents. Federated learning across deployments. Built by one person in a gap year.
+
+---
+
 ## Autonomous AI Security Platform
 
 SENTINEL is a fully autonomous penetration testing and security operations platform where AI agents simultaneously attack and defend your infrastructure. It does not just find vulnerabilities. It understands them, exploits them, patches them, and learns from every engagement to become smarter over time.
